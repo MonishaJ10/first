@@ -1398,3 +1398,36 @@ NEXTGEN-UI/
 ├── tsconfig.app.json
 ├── tsconfig.json
 └── tsconfig.spec.json
+
+.container {
+  display: flex;
+  align-items: center;
+  justify-content: start;
+  padding-left: 1em;
+  width: 100%;
+  height: 70px;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.14);
+  border-top: rgb(0 119 72) 6px solid;
+  background-color: white;
+  z-index: 1000;
+}
+
+.logo img {
+  height: 50px; /* better aspect ratio */
+  width: auto;
+  background-color: transparent;
+}
+
+.logo {
+  margin-right: 1em;
+}
+
+.title {
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  font-size: 1.5em;
+  color: rgba(14, 89, 139, 0.76);
+  text-shadow: 1px 1px 10px rgba(13, 1, 234, 0.2);
+  font-style: italic;
+  padding-top: 0.2em;
+}
