@@ -1398,7 +1398,7 @@ NEXTGEN-UI/
 ├── tsconfig.app.json
 ├── tsconfig.json
 └── tsconfig.spec.json
-
+header.comp.css
 .container {
   display: flex;
   align-items: center;
@@ -1431,3 +1431,185 @@ NEXTGEN-UI/
   font-style: italic;
   padding-top: 0.2em;
 }
+
+login.comp.html
+<app-header></app-header>
+
+<div *ngIf="!isLogin" class="Login">
+  <div class="container">
+    <h1 class="title">LOGIN</h1>
+    <div class="item">
+      <label for="email">Email</label>
+      <input id="email" [(ngModel)]="email" type="email" required />
+    </div>
+    <div class="item">
+      <label for="password">Password</label>
+      <input id="password" [(ngModel)]="password" type="password" required />
+    </div>
+    <button (click)="submit()" class="betterOutline">LOGIN</button>
+    <p class="toggle-text">
+      Don't have an account?
+      <a href="#" (click)="onSwitch()">Sign Up</a>
+    </p>
+  </div>
+</div>
+
+<div *ngIf="isLogin" class="Login">
+  <div class="container">
+    <h1 class="title">SIGN UP</h1>
+    <div class="item">
+      <label for="email">Email</label>
+      <input id="email" [(ngModel)]="email" type="email" required />
+    </div>
+    <div class="item">
+      <label for="password">Password</label>
+      <input id="password" [(ngModel)]="password" type="password" required />
+    </div>
+    <button (click)="submit()" class="betterOutline">SIGN UP</button>
+    <p class="toggle-text">
+      Already have an account?
+      <a href="#" (click)="onSwitch()">Login</a>
+    </p>
+  </div>
+</div>
+
+<app-footer></app-footer>
+
+login.comp.css
+.Login {
+  background: linear-gradient(0deg, rgb(201, 201, 201) 22%, rgba(0, 0, 0, 1) 69%, rgba(9, 9, 20, 1) 79%, rgb(0, 0, 0) 100%);
+  height: 100vh;
+  padding-top: 50px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+}
+
+.container {
+  width: 300px;
+  background: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+}
+
+.title {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.item {
+  margin-bottom: 15px;
+}
+
+.item label {
+  display: block;
+  margin-bottom: 5px;
+}
+
+.item input {
+  width: 100%;
+  padding: 8px;
+  box-sizing: border-box;
+}
+
+.betterOutline {
+  padding: 10px 20px;
+  border: none;
+  background-color: #333;
+  color: #fff;
+  cursor: pointer;
+  border-radius: 4px;
+  width: 100%;
+}
+
+.betterOutline:focus {
+  outline: 2px solid blue;
+}
+
+.toggle-text {
+  text-align: center;
+  margin-top: 10px;
+}
+
+login.comp.ts
+import { Component } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { ToastModule } from 'primeng/toast';
+import { HttpClient } from '@angular/common/http';
+import { HeaderComponent } from '../header/header.component';
+import { FooterComponent } from '../footer/footer.component';
+
+@Component({
+  selector: 'app-login',
+  standalone: true,
+  imports: [CommonModule, FormsModule, ToastModule, HeaderComponent, FooterComponent],
+  templateUrl: './login.component.html',
+  styleUrls: ['./login.component.css']
+})
+export class LoginComponent {
+  email = '';
+  password = '';
+  isLogin = false;
+  constructor(private http: HttpClient) {}
+
+  onSwitch() {
+    this.isLogin = !this.isLogin;
+  }
+
+  submit() {
+    const payload = { email: this.email, password: this.password };
+    if (this.isLogin) {
+      // Signup logic
+      this.http.post('http://localhost:3000/signup', payload).subscribe(response => {
+        console.log('Signup successful:', response);
+      });
+    } else {
+      // Login logic
+      this.http.post('http://localhost:3000/login', payload).subscribe(response => {
+        console.log('Login successful:', response);
+      });
+    }
+  }
+}
+
+login.como.specs.ts
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { LoginComponent } from './login.component';
+import { HttpClientTestingModule } from '@angular/common/http/testing';
+import { FormsModule } from '@angular/forms';
+import { HeaderComponent } from '../header/header.component';
+import { FooterComponent } from '../footer/footer.component';
+
+describe('LoginComponent', () => {
+  let component: LoginComponent;
+  let fixture: ComponentFixture<LoginComponent>;
+
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [
+        HttpClientTestingModule,
+        FormsModule,
+        HeaderComponent,
+        FooterComponent
+      ],
+      declarations: [LoginComponent]
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(LoginComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+  });
+
+  it('should create the login component', () => {
+    expect(component).toBeTruthy();
+  });
+
+  it('should toggle between login and sign-up', () => {
+    const initial = component.isLogin;
+    component.onSwitch();
+    expect(component.isLogin).toBe(!initial);
+  });
+});
