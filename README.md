@@ -1474,4 +1474,149 @@ login.comp.html
 </div>
 
 <app-footer></app-footer>
+_____________________________________________________________________________________________________
+<div class="container">
+  <div class="card flex justify-content-center">
+    <p-sidebar #sidebarRef [(visible)]="sidebarVisible" position="left" styleClass="custom-sidebar" [baseZIndex]="10000">
+      <ng-template pTemplate="headless">
+        <div class="sidebar-header flex align-items-center justify-content-between px-4 pt-3">
+          <span class="brand-title text-white">Recon NextGen</span>
+          <p-button type="button" (click)="closeCallback($event)" icon="pi pi-times" class="p-button-rounded p-button-text p-button-danger"></p-button>
+        </div>
+        <div class="sidebar-content overflow-y-auto">
+          <ul class="menu-list">
+            <li (click)="navigateToPath('home')" class="menu-item">
+              <i class="pi pi-home menu-icon"></i>
+              <span class="menu-label">Home</span>
+            </li>
+            <li class="menu-item">
+              <div class="menu-item-header" (click)="toggleSubMenu('matching')">
+                <i class="pi pi-link menu-icon"></i>
+                <span class="menu-label">Matching</span>
+                <i class="pi pi-chevron-down submenu-toggle-icon" [ngClass]="{'rotated': isSubMenuOpen('matching')}"></i>
+              </div>
+              <ul class="submenu" *ngIf="isSubMenuOpen('matching')">
+                <li (click)="navigateToPath('match')" class="submenu-item">One to One</li>
+                <li (click)="navigateToPath('dragmatch')" class="submenu-item">2</li>
+              </ul>
+            </li>
+            <li (click)="navigateToPath('reports')" class="menu-item">
+              <i class="pi pi-chart-bar menu-icon"></i>
+              <span class="menu-label">Reports</span>
+            </li>
+            <li class="menu-item">
+              <div class="menu-item-header" (click)="toggleSubMenu('parameters')">
+                <i class="pi pi-cog menu-icon"></i>
+                <span class="menu-label">Parameters</span>
+                <i class="pi pi-chevron-down submenu-toggle-icon" [ngClass]="{'rotated': isSubMenuOpen('parameters')}"></i>
+              </div>
+              <ul class="submenu" *ngIf="isSubMenuOpen('parameters')">
+                <li (click)="navigateToPath('exclusion')" class="submenu-item">Exclusion Rules</li>
+                <li (click)="navigateToPath('updation')" class="submenu-item">Updation Rules</li>
+              </ul>
+            </li>
+          </ul>
+        </div>
+      </ng-template>
+    </p-sidebar>
+    <p-button icon="pi pi-bars" class="p-button-rounded p-button-success open-sidebar-button" (click)="sidebarVisible = true"></p-button>
+  </div>
+</div>
 
+
+
+
+.container {
+  position: fixed;
+  top: 10%;
+  left: 0;
+  z-index: 2000;
+  display: flex;
+  justify-content: flex-start;
+  width: 100%;
+}
+
+.custom-sidebar {
+  background-color: #e8f5e9 !important; /* Light green background */
+  width: 16rem !important;
+  max-width: 90%;
+  border-right: 3px solid #388e3c; /* Dark green border */
+  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+}
+
+.sidebar-header {
+  background-color: #388e3c; /* Dark green */
+  padding: 1rem;
+}
+
+.brand-title {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #ffffff;
+}
+
+.sidebar-content {
+  padding: 1rem;
+}
+
+.menu-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.menu-item {
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  color: #2e7d32;
+  border-radius: 4px;
+  transition: background-color 0.3s ease;
+}
+
+.menu-item:hover {
+  background-color: #c8e6c9;
+}
+
+.menu-icon {
+  margin-right: 0.5rem;
+}
+
+.menu-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.submenu {
+  list-style: none;
+  padding-left: 1.5rem;
+  margin-top: 0.5rem;
+}
+
+.submenu-item {
+  padding: 0.5rem 0;
+  cursor: pointer;
+  color: #2e7d32;
+  transition: color 0.3s ease;
+}
+
+.submenu-item:hover {
+  color: #1b5e20;
+}
+
+.submenu-toggle-icon {
+  transition: transform 0.3s ease;
+}
+
+.submenu-toggle-icon.rotated {
+  transform: rotate(180deg);
+}
+
+.open-sidebar-button {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  z-index: 2100;
+}
