@@ -1620,3 +1620,27 @@ ________________________________________________________________________________
   left: 1rem;
   z-index: 2100;
 }
+
+export class SidebarComponent {
+  sidebarVisible: boolean = false;
+
+  openSubMenus: { [key: string]: boolean } = {};
+
+  toggleSubMenu(menu: string): void {
+    this.openSubMenus[menu] = !this.openSubMenus[menu];
+  }
+
+  isSubMenuOpen(menu: string): boolean {
+    return this.openSubMenus[menu];
+  }
+
+  navigateToPath(path: string): void {
+    // Replace this.router with your actual Router import if needed
+    // this.router.navigateByUrl(path);
+    this.sidebarVisible = false;
+  }
+
+  closeCallback(e: any): void {
+    this.sidebarVisible = false;
+  }
+}
