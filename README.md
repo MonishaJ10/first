@@ -1696,3 +1696,193 @@ export class SidebarComponent {
     this.activeSubMenu = this.activeSubMenu === menu ? null : menu;
   }
 }
+
+
+
+=====================
+import { Component, ViewChild } from '@angular/core';
+import { Sidebar } from 'primeng/sidebar';
+import { Router } from '@angular/router';
+
+@Component({
+  selector: 'app-sidebar',
+  templateUrl: './sidebar.component.html',
+  styleUrls: ['./sidebar.component.css'],
+  standalone: true,
+  imports: [
+    Sidebar,
+    // Import other necessary PrimeNG modules here
+  ],
+})
+export class SidebarComponent {
+  @ViewChild('sidebarRef') sidebarRef!: Sidebar;
+  sidebarVisible = false;
+  openSubmenus: { [key: string]: boolean } = {};
+
+  constructor(private router: Router) {}
+
+  toggleSubMenu(menu: string): void {
+    this.openSubmenus[menu] = !this.openSubmenus[menu];
+  }
+
+  isSubMenuOpen(menu: string): boolean {
+    return this.openSubmenus[menu];
+  }
+
+  navigateToPath(path: string): void {
+    this.sidebarVisible = false;
+    this.router.navigateByUrl(path);
+  }
+
+  closeCallback(): void {
+    this.sidebarVisible = false;
+  }
+}
+
+html
+<div class="container">
+  <div class="card flex justify-content-center">
+    <p-sidebar #sidebarRef [(visible)]="sidebarVisible" position="left" styleClass="custom-sidebar" [baseZIndex]="10000">
+      <ng-template pTemplate="headless">
+        <div class="sidebar-header flex align-items-center justify-content-between px-4 pt-3">
+          <span class="brand-title text-white">Recon NextGen</span>
+          <button pButton type="button" (click)="closeCallback()" icon="pi pi-times" class="p-button-rounded p-button-text p-button-danger"></button>
+        </div>
+        <div class="sidebar-content overflow-y-auto">
+          <ul class="menu-list">
+            <li (click)="navigateToPath('home')" class="menu-item">
+              <i class="pi pi-home menu-icon"></i>
+              <span class="menu-label">Home</span>
+            </li>
+
+            <li class="menu-item">
+              <div class="menu-item-header" (click)="toggleSubMenu('matching')">
+                <i class="pi pi-link menu-icon"></i>
+                <span class="menu-label">Matching</span>
+                <i class="pi pi-chevron-down submenu-toggle-icon" [ngClass]="{'rotated': isSubMenuOpen('matching')}"></i>
+              </div>
+              <ul class="submenu" *ngIf="isSubMenuOpen('matching')">
+                <li (click)="navigateToPath('match')" class="submenu-item">One to One</li>
+                <li (click)="navigateToPath('dragmatch')" class="submenu-item">2</li>
+              </ul>
+            </li>
+
+            <li (click)="navigateToPath('reports')" class="menu-item">
+              <i class="pi pi-chart-bar menu-icon"></i>
+              <span class="menu-label">Reports</span>
+            </li>
+
+            <li class="menu-item">
+              <div class="menu-item-header" (click)="toggleSubMenu('sub')">
+                <i class="pi pi-folder menu-icon"></i>
+                <span class="menu-label">Sub</span>
+                <i class="pi pi-chevron-down submenu-toggle-icon" [ngClass]="{'rotated': isSubMenuOpen('sub')}"></i>
+              </div>
+              <ul class="submenu" *ngIf="isSubMenuOpen('sub')">
+                <li (click)="navigateToPath('summary')" class="submenu-item">Summary</li>
+              </ul>
+            </li>
+
+            <li class="menu-item">
+              <div class="menu-item-header" (click)="toggleSubMenu('parameters')">
+                <i class="pi pi-cog menu-icon"></i>
+                <span class="menu-label">Parameters</span>
+                <i class="pi pi-chevron-down submenu-toggle-icon" [ngClass]="{'rotated': isSubMenuOpen('parameters')}"></i>
+              </div>
+              <ul class="submenu" *ngIf="isSubMenuOpen('parameters')">
+                <li (click)="navigateToPath('exclusion')" class="submenu-item">Exclusion Rules</li>
+                <li (click)="navigateToPath('updation')" class="submenu-item">Updation Rules</li>
+              </ul>
+            </li>
+          </ul>
+        </div>
+      </ng-template>
+    </p-sidebar>
+    <button pButton icon="pi pi-bars" class="p-button-rounded p-button-success open-sidebar-button" (click)="sidebarVisible = true"></button>
+  </div>
+</div>
+
+
+css
+.container {
+  position: fixed;
+  top: 10%;
+  left: 0;
+  z-index: 2000;
+  display: flex;
+  justify-content: flex-start;
+  width: 100%;
+}
+
+.custom-sidebar {
+  width: 250px;
+  background-color: #ffffff;
+  border-right: 2px solid #4caf50;
+}
+
+.sidebar-header {
+  background-color: #4caf50;
+  color: #ffffff;
+  padding: 1rem;
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+
+.menu-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.menu-item {
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  color: #333333;
+  transition: background-color 0.3s;
+}
+
+.menu-item:hover {
+  background-color: #e8f5e9;
+}
+
+.menu-icon {
+  margin-right: 0.5rem;
+  color: #4caf50;
+}
+
+.menu-label {
+  flex-grow: 1;
+}
+
+.submenu {
+  list-style: none;
+  padding-left: 1.5rem;
+  background-color: #f1f8e9;
+}
+
+.submenu-item {
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  color: #333333;
+  transition: background-color 0.3s;
+}
+
+.submenu-item:hover {
+  background-color: #dcedc8;
+}
+
+.submenu-toggle-icon {
+  transition: transform 0.3s;
+}
+
+.submenu-toggle-icon.rotated {
+  transform: rotate(180deg);
+}
+
+.open-sidebar-button {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+}
