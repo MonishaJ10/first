@@ -1644,3 +1644,55 @@ export class SidebarComponent {
     this.sidebarVisible = false;
   }
 }
+
+--------------------
+import { Component, ViewChild } from '@angular/core';
+import { Sidebar } from 'primeng/sidebar';
+import { Router } from '@angular/router';
+import { CommonModule } from '@angular/common';
+
+import { SidebarModule } from 'primeng/sidebar';
+import { ButtonModule } from 'primeng/button';
+import { RippleModule } from 'primeng/ripple';
+import { AvatarModule } from 'primeng/avatar';
+import { StyleClassModule } from 'primeng/styleclass';
+
+@Component({
+  selector: 'app-sidebar',
+  standalone: true,
+  imports: [
+    CommonModule,
+    SidebarModule,
+    ButtonModule,
+    RippleModule,
+    AvatarModule,
+    StyleClassModule
+  ],
+  templateUrl: './sidebar.component.html',
+  styleUrls: ['./sidebar.component.css']
+})
+export class SidebarComponent {
+  @ViewChild('sidebarRef') sidebarRef!: Sidebar;
+
+  sidebarVisible: boolean = false;
+  activeSubMenu: string | null = null;
+
+  constructor(private router: Router) {}
+
+  closeCallback(e: any): void {
+    this.sidebarRef.close(e);
+  }
+
+  navigateToPath(path: string): void {
+    this.router.navigateByUrl(path);
+    this.sidebarVisible = false; // Close sidebar on navigation
+  }
+
+  isSubMenuOpen(menu: string): boolean {
+    return this.activeSubMenu === menu;
+  }
+
+  toggleSubMenu(menu: string): void {
+    this.activeSubMenu = this.activeSubMenu === menu ? null : menu;
+  }
+}
