@@ -1886,3 +1886,95 @@ css
   top: 1rem;
   left: 1rem;
 }
+
+
+
+
+<!-- Toggle Button: Only visible when sidebar is hidden -->
+<button *ngIf="!sidebarVisible"
+        pButton
+        icon="pi pi-bars"
+        class="p-button-rounded p-button-success open-sidebar-button"
+        (click)="sidebarVisible = true">
+</button>
+
+<!-- Sidebar -->
+<div class="container">
+  <div class="card flex justify-content-center">
+
+    <p-sidebar [(visible)]="sidebarVisible"
+               position="left"
+               styleClass="custom-sidebar"
+               [baseZIndex]="10000"
+               [modal]="true">
+
+      <!-- Custom Headless Template -->
+      <ng-template pTemplate="headless">
+        <div class="sidebar-header flex align-items-center justify-content-between px-4 pt-3">
+          <span class="brand-title text-white">Recon NextGen</span>
+          
+          <!-- Close Button -->
+          <button pButton
+                  type="button"
+                  (click)="sidebarVisible = false"
+                  icon="pi pi-times"
+                  class="p-button-rounded p-button-text p-button-danger">
+          </button>
+        </div>
+
+        <div class="sidebar-content overflow-y-auto">
+          <ul class="menu-list">
+
+            <li (click)="navigateToPath('home')" class="menu-item">
+              <i class="pi pi-home menu-icon"></i>
+              <span class="menu-label">Home</span>
+            </li>
+
+            <li class="menu-item">
+              <div class="menu-item-header" (click)="toggleSubMenu('matching')">
+                <i class="pi pi-link menu-icon"></i>
+                <span class="menu-label">Matching</span>
+                <i class="pi pi-chevron-down submenu-toggle-icon" [ngClass]="{'rotated': isSubMenuOpen('matching')}"></i>
+              </div>
+              <ul class="submenu" *ngIf="isSubMenuOpen('matching')">
+                <li (click)="navigateToPath('match')" class="submenu-item">One to One</li>
+                <li (click)="navigateToPath('dragmatch')" class="submenu-item">2</li>
+              </ul>
+            </li>
+
+            <li (click)="navigateToPath('reports')" class="menu-item">
+              <i class="pi pi-chart-bar menu-icon"></i>
+              <span class="menu-label">Reports</span>
+            </li>
+
+            <li class="menu-item">
+              <div class="menu-item-header" (click)="toggleSubMenu('sub')">
+                <i class="pi pi-folder menu-icon"></i>
+                <span class="menu-label">Sub</span>
+                <i class="pi pi-chevron-down submenu-toggle-icon" [ngClass]="{'rotated': isSubMenuOpen('sub')}"></i>
+              </div>
+              <ul class="submenu" *ngIf="isSubMenuOpen('sub')">
+                <li (click)="navigateToPath('summary')" class="submenu-item">Summary</li>
+              </ul>
+            </li>
+
+            <li class="menu-item">
+              <div class="menu-item-header" (click)="toggleSubMenu('parameters')">
+                <i class="pi pi-cog menu-icon"></i>
+                <span class="menu-label">Parameters</span>
+                <i class="pi pi-chevron-down submenu-toggle-icon" [ngClass]="{'rotated': isSubMenuOpen('parameters')}"></i>
+              </div>
+              <ul class="submenu" *ngIf="isSubMenuOpen('parameters')">
+                <li (click)="navigateToPath('exclusion')" class="submenu-item">Exclusion Rules</li>
+                <li (click)="navigateToPath('updation')" class="submenu-item">Updation Rules</li>
+              </ul>
+            </li>
+
+          </ul>
+        </div>
+      </ng-template>
+
+    </p-sidebar>
+
+  </div>
+</div>
