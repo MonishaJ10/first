@@ -148,3 +148,6 @@ public class CsvMergerApplication implements CommandLineRunner {
         System.out.println("✅ File merged and saved to: " + outputPath);
     }
 }
+
+
+mvn dependency:get -Dartifact=org.apache.commons:commons-csv:1.10.0
