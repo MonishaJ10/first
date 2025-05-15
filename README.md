@@ -254,3 +254,31 @@ public class CsvMergeService {
     }
 }
 
+
+
+public void mergeCsvFilesFromPaths(String initialPath, String kondorPath, String outputPath) throws IOException {
+    File initialFile = new File(initialPath);
+    File kondorFile = new File(kondorPath);
+
+    try (
+        InputStream initialStream = new FileInputStream(initialFile);
+        InputStream kondorStream = new FileInputStream(kondorFile)
+    ) {
+        // Wrap files as MultipartFile using a helper (Spring does not do this by default)
+        MultipartFile initialMultipart = new MockMultipartFile("initial", initialFile.getName(), "text/csv", initialStream);
+        MultipartFile kondorMultipart = new MockMultipartFile("kondor", kondorFile.getName(), "text/csv", kondorStream);
+
+        File merged = mergeCsvFiles(initialMultipart, kondorMultipart);
+
+        // Save merged file to desired output path
+        try (InputStream in = new FileInputStream(merged);
+             OutputStream out = new FileOutputStream(outputPath)) {
+            byte[] buffer = new byte[1024];
+            int bytesRead;
+            while ((bytesRead = in.read(buffer)) != -1) {
+                out.write(buffer, 0, bytesRead);
+            }
+        }
+    }
+}
+
