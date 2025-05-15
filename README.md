@@ -151,3 +151,106 @@ public class CsvMergerApplication implements CommandLineRunner {
 
 
 mvn dependency:get -Dartifact=org.apache.commons:commons-csv:1.10.0
+
+
+
+package com.example.csvmerger.service;
+
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVPrinter;
+import org.apache.commons.csv.CSVRecord;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
+
+@Service
+public class CsvMergeService {
+
+    public File mergeCsvFiles(MultipartFile initialMarginFile, MultipartFile kondorFile) throws IOException {
+        List<Map<String, String>> mergedRecords = new ArrayList<>();
+
+        // Read initial margin file
+        Reader reader1 = new InputStreamReader(initialMarginFile.getInputStream(), StandardCharsets.UTF_8);
+        Iterable<CSVRecord> initialMarginRecords = CSVFormat.DEFAULT.withFirstRecordAsHeader().parse(reader1);
+        List<String> initialHeaders = new ArrayList<>(initialMarginRecords.iterator().next().toMap().keySet());
+
+        // Read kondor file
+        Reader reader2 = new InputStreamReader(kondorFile.getInputStream(), StandardCharsets.UTF_8);
+        Iterable<CSVRecord> kondorRecords = CSVFormat.DEFAULT.withFirstRecordAsHeader().parse(reader2);
+        List<String> kondorHeaders = new ArrayList<>(kondorRecords.iterator().next().toMap().keySet());
+
+        // Add all rows from initial margin
+        for (CSVRecord record : initialMarginRecords) {
+            Map<String, String> row = new LinkedHashMap<>();
+            row.put("type nature", "OP");
+            row.put("site code", "3428");
+            row.put("application code", record.get("application code"));
+            row.put("instrument code", record.get("instrument code"));
+            row.put("base currency", record.get("base currency"));
+            row.put("call amount", record.get("call amount"));
+            row.put("rate", record.get("rate"));
+
+            // Add the rest
+            for (String header : initialHeaders) {
+                if (!row.containsKey(header)) {
+                    row.put(header, record.get(header));
+                }
+            }
+            mergedRecords.add(row);
+        }
+
+        // Add all rows from kondor
+        for (CSVRecord record : kondorRecords) {
+            Map<String, String> row = new LinkedHashMap<>();
+            row.put("type nature", record.get("type nature"));
+            row.put("site code", record.get("site code"));
+            row.put("application code", record.get("application code"));
+            row.put("instrument code", record.get("instrument code"));
+            row.put("base currency", record.get(22));
+            row.put("call amount", record.get(21));
+            row.put("rate", record.get(80));
+
+            for (String header : kondorHeaders) {
+                if (!row.containsKey(header)) {
+                    row.put(header, record.get(header));
+                }
+            }
+            mergedRecords.add(row);
+        }
+
+        // Final header list
+        LinkedHashSet<String> headers = new LinkedHashSet<>();
+        headers.add("type nature");
+        headers.add("site code");
+        headers.add("application code");
+        headers.add("instrument code");
+        headers.add("base currency");
+        headers.add("call amount");
+        headers.add("rate");
+
+        for (Map<String, String> record : mergedRecords) {
+            headers.addAll(record.keySet());
+        }
+
+        // Write to file
+        File outputFile = File.createTempFile("merged", ".csv");
+        BufferedWriter writer = new BufferedWriter(new FileWriter(outputFile));
+        CSVPrinter printer = new CSVPrinter(writer, CSVFormat.DEFAULT.withHeader(headers.toArray(new String[0])));
+
+        for (Map<String, String> record : mergedRecords) {
+            List<String> row = new ArrayList<>();
+            for (String header : headers) {
+                row.add(record.getOrDefault(header, ""));
+            }
+            printer.printRecord(row);
+        }
+        printer.flush();
+        printer.close();
+
+        return outputFile;
+    }
+}
+
