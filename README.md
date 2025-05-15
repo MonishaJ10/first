@@ -282,3 +282,162 @@ public void mergeCsvFilesFromPaths(String initialPath, String kondorPath, String
     }
 }
 
+
+
+
+
+package com.example.csvmerger.service;
+
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVPrinter;
+import org.apache.commons.csv.CSVRecord;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.mock.web.MockMultipartFile;
+
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
+
+@Service
+public class CsvMergeService {
+
+    public File mergeCsvFiles(MultipartFile initialMarginFile, MultipartFile kondorFile) throws IOException {
+        List<Map<String, String>> mergedRecords = new ArrayList<>();
+
+        // CSV format with header normalization
+        CSVFormat csvFormat = CSVFormat.DEFAULT
+                .withFirstRecordAsHeader()
+                .withIgnoreHeaderCase()
+                .withTrim();
+
+        // --- Read initial margin file ---
+        Reader reader1 = new InputStreamReader(initialMarginFile.getInputStream(), StandardCharsets.UTF_8);
+        Iterable<CSVRecord> initialMarginIterable = csvFormat.parse(reader1);
+        List<CSVRecord> initialMarginRecords = StreamSupport.stream(initialMarginIterable.spliterator(), false)
+                .collect(Collectors.toList());
+
+        if (initialMarginRecords.isEmpty()) {
+            throw new IllegalArgumentException("Initial margin CSV is empty.");
+        }
+
+        Set<String> initialHeaders = initialMarginRecords.get(0).toMap().keySet();
+        System.out.println("Initial Margin Headers: " + initialHeaders);
+
+        for (CSVRecord record : initialMarginRecords) {
+            Map<String, String> row = new LinkedHashMap<>();
+            row.put("type nature", "OP");
+            row.put("site code", "3428");
+
+            if (!record.isMapped("application code") || !record.isMapped("instrument code") ||
+                !record.isMapped("base currency") || !record.isMapped("call amount") || !record.isMapped("rate")) {
+                throw new IllegalArgumentException("Missing required headers in initial margin file.");
+            }
+
+            row.put("application code", record.get("application code"));
+            row.put("instrument code", record.get("instrument code"));
+            row.put("base currency", record.get("base currency"));
+            row.put("call amount", record.get("call amount"));
+            row.put("rate", record.get("rate"));
+
+            // Add other columns
+            for (String header : initialHeaders) {
+                if (!row.containsKey(header)) {
+                    row.put(header, record.get(header));
+                }
+            }
+            mergedRecords.add(row);
+        }
+
+        // --- Read kondor file ---
+        Reader reader2 = new InputStreamReader(kondorFile.getInputStream(), StandardCharsets.UTF_8);
+        Iterable<CSVRecord> kondorIterable = csvFormat.parse(reader2);
+        List<CSVRecord> kondorRecords = StreamSupport.stream(kondorIterable.spliterator(), false)
+                .collect(Collectors.toList());
+
+        if (kondorRecords.isEmpty()) {
+            throw new IllegalArgumentException("Kondor CSV is empty.");
+        }
+
+        Set<String> kondorHeaders = kondorRecords.get(0).toMap().keySet();
+        System.out.println("Kondor Headers: " + kondorHeaders);
+
+        for (CSVRecord record : kondorRecords) {
+            Map<String, String> row = new LinkedHashMap<>();
+
+            // Defensive checks to avoid IndexOutOfBoundsException
+            row.put("type nature", record.isMapped("type nature") ? record.get("type nature") : "");
+            row.put("site code", record.isMapped("site code") ? record.get("site code") : "");
+            row.put("application code", record.isMapped("application code") ? record.get("application code") : "");
+            row.put("instrument code", record.isMapped("instrument code") ? record.get("instrument code") : "");
+
+            // Using index fallback only if absolutely needed (validate file format beforehand)
+            row.put("base currency", record.size() > 22 ? record.get(22) : "");
+            row.put("call amount", record.size() > 21 ? record.get(21) : "");
+            row.put("rate", record.size() > 80 ? record.get(80) : "");
+
+            for (String header : kondorHeaders) {
+                if (!row.containsKey(header)) {
+                    row.put(header, record.get(header));
+                }
+            }
+            mergedRecords.add(row);
+        }
+
+        // Final header list
+        LinkedHashSet<String> headers = new LinkedHashSet<>();
+        headers.add("type nature");
+        headers.add("site code");
+        headers.add("application code");
+        headers.add("instrument code");
+        headers.add("base currency");
+        headers.add("call amount");
+        headers.add("rate");
+
+        for (Map<String, String> record : mergedRecords) {
+            headers.addAll(record.keySet());
+        }
+
+        // Write to output file
+        File outputFile = File.createTempFile("merged", ".csv");
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(outputFile));
+             CSVPrinter printer = new CSVPrinter(writer, CSVFormat.DEFAULT.withHeader(headers.toArray(new String[0])))) {
+
+            for (Map<String, String> record : mergedRecords) {
+                List<String> row = headers.stream()
+                        .map(h -> record.getOrDefault(h, ""))
+                        .collect(Collectors.toList());
+                printer.printRecord(row);
+            }
+        }
+
+        return outputFile;
+    }
+
+    public void mergeCsvFilesFromPaths(String initialPath, String kondorPath, String outputPath) throws IOException {
+        File initialFile = new File(initialPath);
+        File kondorFile = new File(kondorPath);
+
+        try (
+            InputStream initialStream = new FileInputStream(initialFile);
+            InputStream kondorStream = new FileInputStream(kondorFile)
+        ) {
+            MultipartFile initialMultipart = new MockMultipartFile("initial", initialFile.getName(), "text/csv", initialStream);
+            MultipartFile kondorMultipart = new MockMultipartFile("kondor", kondorFile.getName(), "text/csv", kondorStream);
+
+            File merged = mergeCsvFiles(initialMultipart, kondorMultipart);
+
+            try (InputStream in = new FileInputStream(merged);
+                 OutputStream out = new FileOutputStream(outputPath)) {
+                byte[] buffer = new byte[1024];
+                int bytesRead;
+                while ((bytesRead = in.read(buffer)) != -1) {
+                    out.write(buffer, 0, bytesRead);
+                }
+            }
+        }
+    }
+}
+
