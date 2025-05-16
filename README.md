@@ -597,3 +597,68 @@ for (String required : requiredHeaders) {
         throw new IllegalArgumentException("Missing required header in initial margin file: " + required);
     }
 }
+
+
+package com.example.csvmerger.service;
+
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVPrinter;
+import org.apache.commons.csv.CSVRecord;
+import org.springframework.stereotype.Service;
+
+import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+
+@Service
+public class CsvMergeService {
+
+    public void mergeCsvFiles(Path initialMarginPath, Path kondorPath, Path outputPath) {
+        List<String[]> mergedRows = new ArrayList<>();
+        List<String> headers = List.of("Application Code", "Instrument Code", "Base Currency", "Call Amount", "Rate", "Type Nature");
+
+        try (
+                Reader initialReader = Files.newBufferedReader(initialMarginPath);
+                Reader kondorReader = Files.newBufferedReader(kondorPath);
+                Writer writer = Files.newBufferedWriter(outputPath);
+                CSVPrinter csvPrinter = new CSVPrinter(writer, CSVFormat.DEFAULT.withHeader(headers.toArray(new String[0])))
+        ) {
+            // Read Initial Margin
+            Iterable<CSVRecord> initialRecords = CSVFormat.DEFAULT.withFirstRecordAsHeader().parse(initialReader);
+            for (CSVRecord record : initialRecords) {
+                String applicationCode = "3428";
+                String instrumentCode = "NULL"; // Not in initial margin
+                String baseCurrency = record.get("Base Currency").trim();
+                String callAmount = record.get("Call Amount").trim();
+                String rate = record.get("Rate").trim();
+                String typeNature = "OP"; // Not in initial margin
+
+                mergedRows.add(new String[]{applicationCode, instrumentCode, baseCurrency, callAmount, rate, typeNature});
+            }
+
+            // Read Kondor
+            Iterable<CSVRecord> kondorRecords = CSVFormat.DEFAULT.withFirstRecordAsHeader().parse(kondorReader);
+            for (CSVRecord record : kondorRecords) {
+                String applicationCode = "3428";
+                String instrumentCode = record.isMapped("Instrument Code") ? record.get("Instrument Code").trim() : "NULL";
+                String baseCurrency = record.size() > 22 ? record.get(22).trim() : ""; // Column 22 index for Base Currency
+                String callAmount = ""; // Not in kondor
+                String rate = "";       // Not in kondor
+                String typeNature = record.isMapped("Type Nature") ? record.get("Type Nature").trim() : "NULL";
+
+                mergedRows.add(new String[]{applicationCode, instrumentCode, baseCurrency, callAmount, rate, typeNature});
+            }
+
+            // Write to merged CSV
+            for (String[] row : mergedRows) {
+                csvPrinter.printRecord((Object[]) row);
+            }
+
+            csvPrinter.flush();
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Error while merging CSV files: " + e.getMessage(), e);
+        }
+    }
+}
