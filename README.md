@@ -1019,3 +1019,55 @@ public class CsvMergeService {
         return key; // fallback
     }
 }
+
+
+package com.example.csvmerger.controller;
+
+import com.example.csvmerger.service.CsvMergeService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+@RestController
+@RequestMapping("/api/csv")
+public class CsvController {
+
+    @Autowired
+    private CsvMergeService csvMergeService;
+
+    @PostMapping(value = "/merge", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<byte[]> mergeCsvFiles(
+            @RequestParam("initialFile") MultipartFile initialFile,
+            @RequestParam("kondorFile") MultipartFile kondorFile) throws IOException {
+
+        // Save both files to temporary locations
+        Path tempInitial = Files.createTempFile("initial-", ".csv");
+        Path tempKondor = Files.createTempFile("kondor-", ".csv");
+        Path tempOutput = Files.createTempFile("merged-", ".csv");
+
+        initialFile.transferTo(tempInitial.toFile());
+        kondorFile.transferTo(tempKondor.toFile());
+
+        // Merge logic
+        csvMergeService.mergeCsvFiles(tempInitial, tempKondor, tempOutput);
+
+        byte[] mergedBytes = Files.readAllBytes(tempOutput);
+
+        // Clean up temporary files
+        Files.deleteIfExists(tempInitial);
+        Files.deleteIfExists(tempKondor);
+        Files.deleteIfExists(tempOutput);
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"merged.csv\"")
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(mergedBytes);
+    }
+}
