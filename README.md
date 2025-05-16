@@ -1076,101 +1076,88 @@ public class CsvController {
 updated
 package com.example.csvmerger.service;
 
-import org.apache.commons.csv.*;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 
 @Service
 public class CsvMergeService {
 
-    public ByteArrayOutputStream mergeCsvFiles(MultipartFile initialFile, MultipartFile kondorFile) throws IOException {
-        try (
-                Reader initialReader = new InputStreamReader(initialFile.getInputStream());
-                Reader kondorReader = new InputStreamReader(kondorFile.getInputStream());
-                ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-                Writer writer = new OutputStreamWriter(outputStream)
-        ) {
-            CSVParser initialParser = CSVFormat.DEFAULT.withFirstRecordAsHeader().parse(initialReader);
-            CSVParser kondorParser = CSVFormat.DEFAULT.withFirstRecordAsHeader().parse(kondorReader);
+    public void mergeCsvFiles(Path initialPath, Path kondorPath, Path outputPath) throws IOException {
+        List<String[]> initialData = readCsv(initialPath);
+        List<String[]> kondorData = readCsv(kondorPath);
 
-            // Headers
-            Set<String> headers = new LinkedHashSet<>();
-            headers.add("Site Code");
-            headers.add("Application Code");
-            headers.add("Type Nature");
-            headers.add("Base Currency");
+        if (initialData.isEmpty() || kondorData.isEmpty()) {
+            throw new IllegalArgumentException("One or both CSV files are empty.");
+        }
 
-            headers.addAll(initialParser.getHeaderMap().keySet());
-            headers.addAll(kondorParser.getHeaderMap().keySet());
+        // Prepare header
+        List<String> mergedHeader = new ArrayList<>();
+        mergedHeader.add("Site code");               // fixed 3428
+        mergedHeader.add("Application code");        // from kondor
+        mergedHeader.add("Base currency");           // new column
+        mergedHeader.addAll(List.of(initialData.get(0)));  // rest from initial file
+        mergedHeader.addAll(List.of(kondorData.get(0)));   // rest from kondor file
 
-            CSVPrinter printer = new CSVPrinter(writer, CSVFormat.DEFAULT.withHeader(headers.toArray(new String[0])));
+        List<String[]> mergedData = new ArrayList<>();
+        mergedData.add(mergedHeader.toArray(new String[0]));
 
-            // Initial File Rows
-            for (CSVRecord record : initialParser) {
-                Map<String, String> row = new HashMap<>();
+        int dataSize = Math.min(initialData.size() - 1, kondorData.size() - 1);
 
-                for (String header : initialParser.getHeaderMap().keySet()) {
-                    row.put(header, record.get(header));
-                }
+        for (int i = 1; i <= dataSize; i++) {
+            String[] initialRow = initialData.get(i);
+            String[] kondorRow = kondorData.get(i);
 
-                row.put("Site Code", "3428");
-                row.put("Application Code", ""); // empty for initial
-                row.put("Type Nature", "OP");
+            String siteCode = "3428";
+            String applicationCode = kondorRow[1]; // assuming 2nd column in Kondor is Application Code
+            String baseCurrencyInitial = initialRow[6]; // assuming 'initial margin base currency' is at index 6
+            String baseCurrencyCol22 = kondorRow.length > 22 ? kondorRow[22] : ""; // column 22 (0-based)
 
-                // Add Base Currency from its own column
-                row.put("Base Currency", record.get("Base Currency"));
+            String baseCurrency = baseCurrencyInitial + " | " + baseCurrencyCol22;
 
-                List<String> orderedRow = new ArrayList<>();
-                for (String header : headers) {
-                    orderedRow.add(row.getOrDefault(header, ""));
-                }
+            List<String> mergedRow = new ArrayList<>();
+            mergedRow.add(siteCode);
+            mergedRow.add(applicationCode);
+            mergedRow.add(baseCurrency);
+            addArrayToList(mergedRow, initialRow);
+            addArrayToList(mergedRow, kondorRow);
 
-                printer.printRecord(orderedRow);
+            mergedData.add(mergedRow.toArray(new String[0]));
+        }
+
+        writeCsv(outputPath, mergedData);
+    }
+
+    private List<String[]> readCsv(Path path) throws IOException {
+        List<String[]> lines = new ArrayList<>();
+        try (BufferedReader reader = Files.newBufferedReader(path)) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                lines.add(line.split(",", -1)); // Include empty fields
             }
+        }
+        return lines;
+    }
 
-            // Kondor File Rows
-            for (CSVRecord record : kondorParser) {
-                Map<String, String> row = new HashMap<>();
-
-                for (String header : kondorParser.getHeaderMap().keySet()) {
-                    row.put(header, record.get(header));
-                }
-
-                row.put("Site Code", record.get("Site Code"));
-                row.put("Application Code", record.get("Application Code"));
-                row.put("Type Nature", record.get("Type Nature"));
-
-                // Base Currency is in column 22 (index 21)
-                String baseCurrency = record.size() > 21 ? record.get(21) : "";
-                row.put("Base Currency", baseCurrency);
-
-                List<String> orderedRow = new ArrayList<>();
-                for (String header : headers) {
-                    orderedRow.add(row.getOrDefault(header, ""));
-                }
-
-                printer.printRecord(orderedRow);
+    private void writeCsv(Path path, List<String[]> data) throws IOException {
+        try (BufferedWriter writer = Files.newBufferedWriter(path)) {
+            for (String[] line : data) {
+                writer.write(String.join(",", line));
+                writer.newLine();
             }
-
-            printer.flush();
-            return outputStream;
         }
     }
 
-    // Optional CLI method for merging by path
-    public void mergeCsvFiles(Path initialPath, Path kondorPath, Path outputPath) throws IOException {
-        MultipartFile initialFile = new MockMultipartFile("initial", Files.readAllBytes(initialPath));
-        MultipartFile kondorFile = new MockMultipartFile("kondor", Files.readAllBytes(kondorPath));
-        ByteArrayOutputStream merged = mergeCsvFiles(initialFile, kondorFile);
-        Files.write(outputPath, merged.toByteArray());
+    private void addArrayToList(List<String> list, String[] array) {
+        for (String s : array) {
+            list.add(s);
+        }
     }
 }
-
 
 
 1. CsvMergerApplication.java
@@ -1184,6 +1171,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 import java.nio.file.Path;
+import java.nio.file.Paths;
 
 @SpringBootApplication
 public class CsvMergerApplication implements CommandLineRunner {
@@ -1197,15 +1185,18 @@ public class CsvMergerApplication implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        // Uncomment to test without POST API
-        /*
-        String initialPath = "C:\\Users\\h59606\\Downloads\\Initial_Margin_E0D_20250307.csv";
-        String kondorPath = "C:\\Users\\h59606\\Downloads\\KONDORFX.csv";
-        String outputPath = "C:\\Users\\h59606\\Downloads\\merged_output.csv";
+        // Provide correct file paths
+        Path initialPath = Paths.get("C:\\Users\\h59606\\Downloads\\Initial_Margin.csv");
+        Path kondorPath = Paths.get("C:\\Users\\h59606\\Downloads\\KondorData.csv");
+        Path outputPath = Paths.get("C:\\Users\\h59606\\Downloads\\Merged_Output.csv");
 
-        csvMergeService.mergeCsvFiles(Path.of(initialPath), Path.of(kondorPath), Path.of(outputPath));
-        System.out.println("File merged and saved to: " + outputPath);
-        */
+        try {
+            csvMergeService.mergeCsvFiles(initialPath, kondorPath, outputPath);
+            System.out.println("CSV files merged successfully. Output at: " + outputPath);
+        } catch (Exception e) {
+            System.err.println("Error merging CSV files: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 }
 
