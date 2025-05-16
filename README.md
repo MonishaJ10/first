@@ -1245,140 +1245,126 @@ public class CsvController {
 ---
 
 
-Final Version: CsvMergeService.java
-
-package com.example.csvmerger.service;
-
-import org.apache.commons.csv.CSVFormat;
-import org.apache.commons.csv.CSVPrinter;
-import org.apache.commons.csv.CSVRecord;
-import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
-
-import java.io.*;
-import java.util.*;
-
-@Service
-public class CsvMergeService {
-
-    public File mergeCsvFiles(MultipartFile initialFile, MultipartFile kondorFile) throws IOException {
-
-        Reader initialReader = new InputStreamReader(initialFile.getInputStream());
-        Reader kondorReader = new InputStreamReader(kondorFile.getInputStream());
-
-        Iterable<CSVRecord> initialRecords = CSVFormat.DEFAULT.withFirstRecordAsHeader().parse(initialReader);
-        Iterable<CSVRecord> kondorRecords = CSVFormat.DEFAULT.withFirstRecordAsHeader().parse(kondorReader);
-
-        Map<String, String> siteCodeMap = new HashMap<>();
-        Map<String, String> applicationCodeMap = new HashMap<>();
-        Map<String, List<String>> baseCurrencyMap = new LinkedHashMap<>();
-
-        // Step 1: Read from kondor to map application code and site code
-        for (CSVRecord record : kondorRecords) {
-            String applicationCode = record.get("Application Code");
-            String siteCode = record.get("Site Code");
-
-            applicationCodeMap.put(applicationCode, applicationCode); // just carry over
-            siteCodeMap.put(applicationCode, siteCode);
-        }
-
-        // Step 2: Read from initial margin
-        for (CSVRecord record : initialRecords) {
-            String applicationCode = record.get("Application Code");
-            String baseCurrency1 = record.get("Initial Margin Base Currency");
-            String col22 = record.get("Col22");
-
-            String siteCode = siteCodeMap.getOrDefault(applicationCode, "3428");
-            String baseCurrency = baseCurrency1;
-
-            baseCurrencyMap.putIfAbsent(applicationCode, new ArrayList<>());
-            baseCurrencyMap.get(applicationCode).add(baseCurrency + "," + col22 + "," + siteCode);
-        }
-
-        // Step 3: Create output file
-        File outputFile = new File("merged_output.csv");
-        BufferedWriter writer = new BufferedWriter(new FileWriter(outputFile));
-        CSVPrinter csvPrinter = new CSVPrinter(writer, CSVFormat.DEFAULT
-                .withHeader("Application Code", "Base Currency", "Col22", "Site Code"));
-
-        for (Map.Entry<String, List<String>> entry : baseCurrencyMap.entrySet()) {
-            String appCode = entry.getKey();
-            for (String combinedValue : entry.getValue()) {
-                String[] parts = combinedValue.split(",");
-                csvPrinter.printRecord(appCode, parts[0], parts[1], parts[2]);
-            }
-        }
-
-        csvPrinter.flush();
-        csvPrinter.close();
-        return outputFile;
-    }
-}
+Here is the complete working Spring Boot application that merges two local CSV files (Initial_Margin.csv and Kondor.csv) and writes the result to an output CSV file (merged_output.csv) — all using local file paths without any web controller.
 
 
 ---
 
-✅ CsvController.java
+1. CsvMergerApplication.java
 
-package com.example.csvmerger.controller;
+package com.example.csvmerger;
 
 import com.example.csvmerger.service.CsvMergeService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.*;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
-@RestController
-@RequestMapping("/csv")
-public class CsvController {
+@SpringBootApplication
+public class CsvMergerApplication implements CommandLineRunner {
 
     @Autowired
     private CsvMergeService csvMergeService;
 
-    @PostMapping("/merge")
-    public ResponseEntity<byte[]> mergeCsvFiles(
-            @RequestParam("initialFile") MultipartFile initialFile,
-            @RequestParam("kondorFile") MultipartFile kondorFile) throws IOException {
-
-        File mergedFile = csvMergeService.mergeCsvFiles(initialFile, kondorFile);
-        byte[] fileContent = new FileInputStream(mergedFile).readAllBytes();
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentDisposition(ContentDisposition.attachment().filename("merged_output.csv").build());
-        headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
-
-        return new ResponseEntity<>(fileContent, headers, HttpStatus.OK);
-    }
-}
-
-
----
-
-✅ CsvMergerApplication.java
-
-package com.example.csvmerger;
-
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-
-@SpringBootApplication
-public class CsvMergerApplication {
     public static void main(String[] args) {
         SpringApplication.run(CsvMergerApplication.class, args);
     }
+
+    @Override
+    public void run(String... args) throws Exception {
+        Path initialFilePath = Paths.get("C:/Users/h59606/Downloads/Initial_Margin.csv");
+        Path kondorFilePath = Paths.get("C:/Users/h59606/Downloads/Kondor.csv");
+        Path outputFilePath = Paths.get("C:/Users/h59606/Downloads/merged_output.csv");
+
+        csvMergeService.mergeCsvFiles(initialFilePath, kondorFilePath, outputFilePath);
+        System.out.println("CSV files merged successfully!");
+    }
 }
 
 
 ---
 
-✅ How to Test:
+2. CsvMergeService.java
 
-1. Run your Spring Boot application.
+package com.example.csvmerger.service;
+
+import org.springframework.stereotype.Service;
+
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.HashSet;
+import java.util.Set;
+
+@Service
+public class CsvMergeService {
+
+    public void mergeCsvFiles(Path initialFilePath, Path kondorFilePath, Path outputFilePath) throws IOException {
+        Set<String> lines = new HashSet<>();
+
+        // Read Initial file
+        try (BufferedReader reader = Files.newBufferedReader(initialFilePath)) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                lines.add(line);
+            }
+        }
+
+        // Read Kondor file
+        try (BufferedReader reader = Files.newBufferedReader(kondorFilePath)) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                lines.add(line);
+            }
+        }
+
+        // Write merged output
+        try (BufferedWriter writer = Files.newBufferedWriter(outputFilePath)) {
+            for (String line : lines) {
+                writer.write(line);
+                writer.newLine();
+            }
+        }
+    }
+}
 
 
-2. Use Postman or your browser to call:
-POST http://localhost:8080/csv/merge
+---
+
+3. Project Structure (for reference)
+
+src
+└── main
+    └── java
+        └── com
+            └── example
+                └── csvmerger
+                    ├── CsvMergerApplication.java
+                    └── service
+                        └── CsvMergeService.java
+
+
+---
+
+4. Output
+
+The merged file will be saved as:
+
+C:/Users/h59606/Downloads/merged_output.csv
+
+Let me know if you want:
+
+Header handling
+
+Duplicate filtering logic
+
+Sorting
+
+Merge by a specific column, etc.
+
+
