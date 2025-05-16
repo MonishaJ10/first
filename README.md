@@ -441,3 +441,149 @@ public class CsvMergeService {
     }
 }
 
+
+recent 
+package com.example.csvmerger.service;
+
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVPrinter;
+import org.apache.commons.csv.CSVRecord;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.mock.web.MockMultipartFile;
+
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
+
+@Service
+public class CsvMergeService {
+
+    public File mergeCsvFiles(MultipartFile initialMarginFile, MultipartFile kondorFile) throws IOException {
+        List<Map<String, String>> mergedRecords = new ArrayList<>();
+
+        // Read initial margin file
+        Reader reader1 = new InputStreamReader(initialMarginFile.getInputStream(), StandardCharsets.UTF_8);
+        Iterable<CSVRecord> initialMarginRecords = CSVFormat.DEFAULT.withFirstRecordAsHeader().parse(reader1);
+        Iterator<CSVRecord> initialIterator = initialMarginRecords.iterator();
+        if (!initialIterator.hasNext()) {
+            throw new IllegalArgumentException("Initial margin file is empty or invalid.");
+        }
+        List<String> initialHeaders = new ArrayList<>(initialIterator.next().toMap().keySet());
+
+        // Read kondor file
+        Reader reader2 = new InputStreamReader(kondorFile.getInputStream(), StandardCharsets.UTF_8);
+        Iterable<CSVRecord> kondorRecords = CSVFormat.DEFAULT.withFirstRecordAsHeader().parse(reader2);
+        Iterator<CSVRecord> kondorIterator = kondorRecords.iterator();
+        if (!kondorIterator.hasNext()) {
+            throw new IllegalArgumentException("Kondor file is empty or invalid.");
+        }
+        List<String> kondorHeaders = new ArrayList<>(kondorIterator.next().toMap().keySet());
+
+        // Re-read the initialMargin file since we moved the iterator once
+        reader1 = new InputStreamReader(initialMarginFile.getInputStream(), StandardCharsets.UTF_8);
+        initialMarginRecords = CSVFormat.DEFAULT.withFirstRecordAsHeader().parse(reader1);
+
+        // Process initial margin file
+        for (CSVRecord record : initialMarginRecords) {
+            Map<String, String> row = new LinkedHashMap<>();
+            row.put("type nature", "OP");
+            row.put("site code", "3428");
+            row.put("application code", "3428");
+
+            String instrumentCode = "NULL";
+            try {
+                instrumentCode = record.get("instrument code");
+            } catch (IllegalArgumentException ignored) {}
+            row.put("instrument code", instrumentCode);
+
+            row.put("base currency", record.get("base currency"));
+            row.put("call amount", record.get("call amount"));
+            row.put("rate", record.get("rate"));
+
+            // Include other headers if any
+            for (String header : initialHeaders) {
+                if (!row.containsKey(header)) {
+                    row.put(header, record.get(header));
+                }
+            }
+
+            mergedRecords.add(row);
+        }
+
+        // Process kondor file
+        for (CSVRecord record : kondorRecords) {
+            Map<String, String> row = new LinkedHashMap<>();
+            row.put("type nature", record.get("type nature"));
+            row.put("site code", record.get("site code"));
+            row.put("application code", record.get("application code"));
+            row.put("instrument code", record.get("instrument code"));
+            row.put("base currency", record.get(22));
+            row.put("call amount", record.get(21));
+            row.put("rate", record.get(80));
+
+            for (String header : kondorHeaders) {
+                if (!row.containsKey(header)) {
+                    row.put(header, record.get(header));
+                }
+            }
+
+            mergedRecords.add(row);
+        }
+
+        // Build final header list
+        LinkedHashSet<String> headers = new LinkedHashSet<>();
+        headers.add("type nature");
+        headers.add("site code");
+        headers.add("application code");
+        headers.add("instrument code");
+        headers.add("base currency");
+        headers.add("call amount");
+        headers.add("rate");
+
+        for (Map<String, String> record : mergedRecords) {
+            headers.addAll(record.keySet());
+        }
+
+        // Write to CSV
+        File outputFile = File.createTempFile("merged", ".csv");
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(outputFile));
+             CSVPrinter printer = new CSVPrinter(writer, CSVFormat.DEFAULT.withHeader(headers.toArray(new String[0])))) {
+
+            for (Map<String, String> record : mergedRecords) {
+                List<String> row = new ArrayList<>();
+                for (String header : headers) {
+                    row.add(record.getOrDefault(header, ""));
+                }
+                printer.printRecord(row);
+            }
+        }
+
+        return outputFile;
+    }
+
+    public void mergeCsvFilesFromPaths(String initialPath, String kondorPath, String outputPath) throws IOException {
+        File initialFile = new File(initialPath);
+        File kondorFile = new File(kondorPath);
+
+        try (
+            InputStream initialStream = new FileInputStream(initialFile);
+            InputStream kondorStream = new FileInputStream(kondorFile)
+        ) {
+            MultipartFile initialMultipart = new MockMultipartFile("initial", initialFile.getName(), "text/csv", initialStream);
+            MultipartFile kondorMultipart = new MockMultipartFile("kondor", kondorFile.getName(), "text/csv", kondorStream);
+
+            File merged = mergeCsvFiles(initialMultipart, kondorMultipart);
+
+            try (InputStream in = new FileInputStream(merged);
+                 OutputStream out = new FileOutputStream(outputPath)) {
+                byte[] buffer = new byte[1024];
+                int bytesRead;
+                while ((bytesRead = in.read(buffer)) != -1) {
+                    out.write(buffer, 0, bytesRead);
+                }
+            }
+        }
+    }
+}
+
