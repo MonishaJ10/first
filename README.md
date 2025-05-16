@@ -587,3 +587,13 @@ public class CsvMergeService {
     }
 }
 
+
+// Required headers in initial margin file
+List<String> requiredHeaders = Arrays.asList("base currency", "call amount", "rate");
+
+Set<String> initialHeaderSet = new HashSet<>(initialHeaders);
+for (String required : requiredHeaders) {
+    if (!initialHeaderSet.contains(required)) {
+        throw new IllegalArgumentException("Missing required header in initial margin file: " + required);
+    }
+}
