@@ -771,13 +771,34 @@ public class CsvMergeService {
 // CsvMergerApplication.java
 package com.example.csvmerger;
 
+import com.example.csvmerger.service.CsvMergeService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
+import java.nio.file.Path;
+
 @SpringBootApplication
-public class CsvMergerApplication {
+public class CsvMergerApplication implements CommandLineRunner {
+
+    @Autowired
+    private CsvMergeService csvMergeService;
+
     public static void main(String[] args) {
         SpringApplication.run(CsvMergerApplication.class, args);
+    }
+
+    @Override
+    public void run(String... args) throws Exception {
+        // Optional: You can disable this block if you're only using the controller for uploads
+        String initialPath = "C:/Users/h59606/Downloads/Initial_Margin_E0D_20250307.csv";
+        String kondorPath = "C:/Users/h59606/Downloads/KONDORFX.csv";
+        String outputPath = "C:/Users/h59606/Downloads/merged_output.csv";
+
+        csvMergeService.mergeCsvFiles(Path.of(initialPath), Path.of(kondorPath), Path.of(outputPath));
+
+        System.out.println("File merged and saved to: " + outputPath);
     }
 }
 
