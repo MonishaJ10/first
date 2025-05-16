@@ -662,3 +662,106 @@ public class CsvMergeService {
         }
     }
 }
+
+
+package com.example.csvmerger.service;
+
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVParser;
+import org.apache.commons.csv.CSVPrinter;
+import org.apache.commons.csv.CSVRecord;
+import org.springframework.stereotype.Service;
+
+import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.*;
+
+@Service
+public class CsvMergeService {
+
+    public void mergeCsvFiles(Path initialMarginPath, Path kondorPath, Path outputPath) {
+        try (
+                Reader reader1 = Files.newBufferedReader(initialMarginPath);
+                Reader reader2 = Files.newBufferedReader(kondorPath);
+                CSVParser parser1 = CSVFormat.DEFAULT.withFirstRecordAsHeader().parse(reader1);
+                CSVParser parser2 = CSVFormat.DEFAULT.withFirstRecordAsHeader().parse(reader2);
+                Writer writer = Files.newBufferedWriter(outputPath);
+                CSVPrinter csvPrinter = new CSVPrinter(writer, CSVFormat.DEFAULT.withHeader(getMergedHeaders(parser1, parser2)))
+        ) {
+            List<String> headers = getMergedHeaders(parser1, parser2);
+
+            for (CSVRecord record : parser1) {
+                Map<String, String> row = new LinkedHashMap<>();
+                for (String header : headers) {
+                    String value;
+                    if (header.equalsIgnoreCase("Application Code")) {
+                        value = "3428";
+                    } else if (header.equalsIgnoreCase("Instrument Code")) {
+                        value = ""; // NULL in CSV is usually left blank
+                    } else if (header.equalsIgnoreCase("Type Nature")) {
+                        value = "OP";
+                    } else {
+                        value = getIgnoreCase(record, header);
+                    }
+                    row.put(header, value);
+                }
+                csvPrinter.printRecord(row.values());
+            }
+
+            for (CSVRecord record : parser2) {
+                Map<String, String> row = new LinkedHashMap<>();
+                for (String header : headers) {
+                    String value;
+                    if (header.equalsIgnoreCase("Application Code")) {
+                        value = ""; // Not present in Kondor
+                    } else if (header.equalsIgnoreCase("Instrument Code")) {
+                        value = getIgnoreCase(record, header);
+                    } else if (header.equalsIgnoreCase("Type Nature")) {
+                        value = getIgnoreCase(record, header);
+                    } else {
+                        value = getIgnoreCase(record, header);
+                    }
+                    row.put(header, value);
+                }
+                csvPrinter.printRecord(row.values());
+            }
+
+        } catch (IOException e) {
+            throw new RuntimeException("Error merging CSV files: " + e.getMessage(), e);
+        }
+    }
+
+    private List<String> getMergedHeaders(CSVParser parser1, CSVParser parser2) {
+        Set<String> headerSet = new LinkedHashSet<>();
+
+        parser1.getHeaderMap().keySet().forEach(h -> headerSet.add(capitalizeFully(h)));
+        parser2.getHeaderMap().keySet().forEach(h -> headerSet.add(capitalizeFully(h)));
+
+        headerSet.add("Application Code");
+        headerSet.add("Instrument Code");
+        headerSet.add("Type Nature");
+
+        return new ArrayList<>(headerSet);
+    }
+
+    private String getIgnoreCase(CSVRecord record, String header) {
+        for (String h : record.toMap().keySet()) {
+            if (h.equalsIgnoreCase(header)) {
+                return record.get(h);
+            }
+        }
+        return "";
+    }
+
+    private String capitalizeFully(String input) {
+        String[] parts = input.toLowerCase().split(" ");
+        StringBuilder sb = new StringBuilder();
+        for (String part : parts) {
+            if (!part.isEmpty()) {
+                sb.append(Character.toUpperCase(part.charAt(0))).append(part.substring(1)).append(" ");
+            }
+        }
+        return sb.toString().trim();
+    }
+}
