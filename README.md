@@ -1074,86 +1074,104 @@ public class CsvController {
 
 
 updated
-// CsvMergeService.java package com.example.csvmerger.service;
+package com.example.csvmerger.service;
 
-import org.apache.commons.csv.*; import org.springframework.stereotype.Service;
+import org.apache.commons.csv.*;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
-import java.io.; import java.nio.file.Files; import java.nio.file.Path; import java.util.;
+import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.*;
 
-@Service public class CsvMergeService {
+@Service
+public class CsvMergeService {
 
-public void mergeCsvFiles(Path initialPath, Path kondorPath, Path outputPath) throws IOException {
-    Reader initialReader = Files.newBufferedReader(initialPath);
-    Reader kondorReader = Files.newBufferedReader(kondorPath);
+    public ByteArrayOutputStream mergeCsvFiles(MultipartFile initialFile, MultipartFile kondorFile) throws IOException {
+        try (
+                Reader initialReader = new InputStreamReader(initialFile.getInputStream());
+                Reader kondorReader = new InputStreamReader(kondorFile.getInputStream());
+                ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+                Writer writer = new OutputStreamWriter(outputStream)
+        ) {
+            CSVParser initialParser = CSVFormat.DEFAULT.withFirstRecordAsHeader().parse(initialReader);
+            CSVParser kondorParser = CSVFormat.DEFAULT.withFirstRecordAsHeader().parse(kondorReader);
 
-    CSVParser initialParser = CSVFormat.DEFAULT.withFirstRecordAsHeader().parse(initialReader);
-    CSVParser kondorParser = CSVFormat.DEFAULT.withFirstRecordAsHeader().parse(kondorReader);
+            // Headers
+            Set<String> headers = new LinkedHashSet<>();
+            headers.add("Site Code");
+            headers.add("Application Code");
+            headers.add("Type Nature");
+            headers.add("Base Currency");
 
-    Set<String> allHeaders = new LinkedHashSet<>();
+            headers.addAll(initialParser.getHeaderMap().keySet());
+            headers.addAll(kondorParser.getHeaderMap().keySet());
 
-    allHeaders.addAll(initialParser.getHeaderMap().keySet());
-    allHeaders.addAll(kondorParser.getHeaderMap().keySet());
+            CSVPrinter printer = new CSVPrinter(writer, CSVFormat.DEFAULT.withHeader(headers.toArray(new String[0])));
 
-    // Normalize columns
-    allHeaders.add("Application Code");
-    allHeaders.add("Site Code");
-    allHeaders.add("Type Nature");
-    allHeaders.add("Base Currency");
+            // Initial File Rows
+            for (CSVRecord record : initialParser) {
+                Map<String, String> row = new HashMap<>();
 
-    List<CSVRecord> initialRecords = initialParser.getRecords();
-    List<CSVRecord> kondorRecords = kondorParser.getRecords();
+                for (String header : initialParser.getHeaderMap().keySet()) {
+                    row.put(header, record.get(header));
+                }
 
-    BufferedWriter writer = Files.newBufferedWriter(outputPath);
-    CSVPrinter printer = new CSVPrinter(writer, CSVFormat.DEFAULT.withHeader(allHeaders.toArray(new String[0])));
+                row.put("Site Code", "3428");
+                row.put("Application Code", ""); // empty for initial
+                row.put("Type Nature", "OP");
 
-    // Write Initial Margin Records
-    for (CSVRecord record : initialRecords) {
-        Map<String, String> row = new HashMap<>();
-        for (String header : initialParser.getHeaderMap().keySet()) {
-            row.put(header, record.get(header));
+                // Add Base Currency from its own column
+                row.put("Base Currency", record.get("Base Currency"));
+
+                List<String> orderedRow = new ArrayList<>();
+                for (String header : headers) {
+                    orderedRow.add(row.getOrDefault(header, ""));
+                }
+
+                printer.printRecord(orderedRow);
+            }
+
+            // Kondor File Rows
+            for (CSVRecord record : kondorParser) {
+                Map<String, String> row = new HashMap<>();
+
+                for (String header : kondorParser.getHeaderMap().keySet()) {
+                    row.put(header, record.get(header));
+                }
+
+                row.put("Site Code", record.get("Site Code"));
+                row.put("Application Code", record.get("Application Code"));
+                row.put("Type Nature", record.get("Type Nature"));
+
+                // Base Currency is in column 22 (index 21)
+                String baseCurrency = record.size() > 21 ? record.get(21) : "";
+                row.put("Base Currency", baseCurrency);
+
+                List<String> orderedRow = new ArrayList<>();
+                for (String header : headers) {
+                    orderedRow.add(row.getOrDefault(header, ""));
+                }
+
+                printer.printRecord(orderedRow);
+            }
+
+            printer.flush();
+            return outputStream;
         }
-        row.put("Site Code", "3428");
-        row.put("Type Nature", "OP");
-        row.put("Application Code", "");  // Leave empty for initial
-
-        // Handle base currency
-        row.put("Base Currency", record.isMapped("base currency") ? record.get("base currency") : "");
-
-        List<String> outputRow = new ArrayList<>();
-        for (String header : allHeaders) {
-            outputRow.add(row.getOrDefault(header, ""));
-        }
-        printer.printRecord(outputRow);
     }
 
-    // Write Kondor Records
-    for (CSVRecord record : kondorRecords) {
-        Map<String, String> row = new HashMap<>();
-        for (String header : kondorParser.getHeaderMap().keySet()) {
-            row.put(header, record.get(header));
-        }
-        row.put("Site Code", record.get("sitecode"));
-        row.put("Application Code", record.get("application code"));
-        row.put("Type Nature", record.get("type nature"));
-
-        // Base Currency from column 22 if available
-        String baseCurrency = record.size() >= 23 ? record.get(22) : "";
-        row.put("Base Currency", baseCurrency);
-
-        List<String> outputRow = new ArrayList<>();
-        for (String header : allHeaders) {
-            outputRow.add(row.getOrDefault(header, ""));
-        }
-        printer.printRecord(outputRow);
+    // Optional CLI method for merging by path
+    public void mergeCsvFiles(Path initialPath, Path kondorPath, Path outputPath) throws IOException {
+        MultipartFile initialFile = new MockMultipartFile("initial", Files.readAllBytes(initialPath));
+        MultipartFile kondorFile = new MockMultipartFile("kondor", Files.readAllBytes(kondorPath));
+        ByteArrayOutputStream merged = mergeCsvFiles(initialFile, kondorFile);
+        Files.write(outputPath, merged.toByteArray());
     }
-
-    printer.flush();
-    printer.close();
-    initialReader.close();
-    kondorReader.close();
 }
 
-}
+
 
 1. CsvMergerApplication.java
 
