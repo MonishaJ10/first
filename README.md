@@ -765,3 +765,140 @@ public class CsvMergeService {
         return sb.toString().trim();
     }
 }
+
+
+
+// CsvMergerApplication.java
+package com.example.csvmerger;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class CsvMergerApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(CsvMergerApplication.class, args);
+    }
+}
+
+
+// CsvMergeService.java
+package com.example.csvmerger.service;
+
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVPrinter;
+import org.apache.commons.csv.CSVRecord;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.*;
+import java.util.*;
+
+@Service
+public class CsvMergeService {
+    public ByteArrayInputStream mergeCsvFiles(MultipartFile initialMargin, MultipartFile kondor) throws IOException {
+        Reader initialReader = new InputStreamReader(initialMargin.getInputStream());
+        Reader kondorReader = new InputStreamReader(kondor.getInputStream());
+
+        Iterable<CSVRecord> initialRecords = CSVFormat.DEFAULT.withFirstRecordAsHeader().parse(initialReader);
+        Iterable<CSVRecord> kondorRecords = CSVFormat.DEFAULT.withFirstRecordAsHeader().parse(kondorReader);
+
+        Set<String> headers = new LinkedHashSet<>();
+        headers.addAll(Arrays.asList("Application Code", "Type Nature"));
+
+        for (CSVRecord record : initialRecords) {
+            headers.addAll(record.toMap().keySet());
+        }
+        for (CSVRecord record : kondorRecords) {
+            headers.addAll(record.toMap().keySet());
+        }
+
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        CSVPrinter printer = new CSVPrinter(new PrintWriter(out), CSVFormat.DEFAULT.withHeader(headers.toArray(new String[0])));
+
+        // Reset Readers for second pass
+        initialReader = new InputStreamReader(initialMargin.getInputStream());
+        kondorReader = new InputStreamReader(kondor.getInputStream());
+        initialRecords = CSVFormat.DEFAULT.withFirstRecordAsHeader().parse(initialReader);
+        kondorRecords = CSVFormat.DEFAULT.withFirstRecordAsHeader().parse(kondorReader);
+
+        for (CSVRecord record : initialRecords) {
+            Map<String, String> map = new LinkedHashMap<>();
+            map.put("Application Code", "3428");
+            map.put("Type Nature", "OP");
+            for (String h : headers) {
+                if (!map.containsKey(h)) {
+                    map.put(h, record.toMap().getOrDefault(h, ""));
+                }
+            }
+            printer.printRecord(map.values());
+        }
+
+        for (CSVRecord record : kondorRecords) {
+            Map<String, String> map = new LinkedHashMap<>();
+            map.put("Application Code", "");
+            map.put("Type Nature", record.toMap().getOrDefault("Type Nature", ""));
+            for (String h : headers) {
+                if (!map.containsKey(h)) {
+                    map.put(h, record.toMap().getOrDefault(h, ""));
+                }
+            }
+            printer.printRecord(map.values());
+        }
+
+        printer.flush();
+        return new ByteArrayInputStream(out.toByteArray());
+    }
+}
+
+
+// CsvController.java
+package com.example.csvmerger.controller;
+
+import com.example.csvmerger.service.CsvMergeService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.ByteArrayInputStream;
+
+@RestController
+@RequestMapping("/api/csv")
+public class CsvController {
+
+    @Autowired
+    private CsvMergeService csvMergeService;
+
+    @PostMapping("/merge")
+    public ResponseEntity<byte[]> mergeCsv(
+            @RequestParam("initial") MultipartFile initial,
+            @RequestParam("kondor") MultipartFile kondor) throws Exception {
+
+        ByteArrayInputStream stream = csvMergeService.mergeCsvFiles(initial, kondor);
+        byte[] output = stream.readAllBytes();
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=merged.csv")
+                .contentType(MediaType.parseMediaType("application/csv"))
+                .body(output);
+    }
+}
+
+
+I've provided the full, updated code for your Spring Boot application, including:
+
+1. CsvMergerApplication.java – Main entry point.
+
+
+2. CsvMergeService.java – Handles the merging logic.
+
+
+3. CsvController.java – REST controller that accepts two CSVs and returns the merged file.
+
+
+
+Let me know if you'd like help testing it or creating a minimal pom.xml to ensure dependencies like commons-csv are set up correctly.
+
