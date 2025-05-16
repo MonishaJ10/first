@@ -1071,3 +1071,166 @@ public class CsvController {
                 .body(mergedBytes);
     }
 }
+
+
+updated
+// CsvMergeService.java package com.example.csvmerger.service;
+
+import org.apache.commons.csv.*; import org.springframework.stereotype.Service;
+
+import java.io.; import java.nio.file.Files; import java.nio.file.Path; import java.util.;
+
+@Service public class CsvMergeService {
+
+public void mergeCsvFiles(Path initialPath, Path kondorPath, Path outputPath) throws IOException {
+    Reader initialReader = Files.newBufferedReader(initialPath);
+    Reader kondorReader = Files.newBufferedReader(kondorPath);
+
+    CSVParser initialParser = CSVFormat.DEFAULT.withFirstRecordAsHeader().parse(initialReader);
+    CSVParser kondorParser = CSVFormat.DEFAULT.withFirstRecordAsHeader().parse(kondorReader);
+
+    Set<String> allHeaders = new LinkedHashSet<>();
+
+    allHeaders.addAll(initialParser.getHeaderMap().keySet());
+    allHeaders.addAll(kondorParser.getHeaderMap().keySet());
+
+    // Normalize columns
+    allHeaders.add("Application Code");
+    allHeaders.add("Site Code");
+    allHeaders.add("Type Nature");
+    allHeaders.add("Base Currency");
+
+    List<CSVRecord> initialRecords = initialParser.getRecords();
+    List<CSVRecord> kondorRecords = kondorParser.getRecords();
+
+    BufferedWriter writer = Files.newBufferedWriter(outputPath);
+    CSVPrinter printer = new CSVPrinter(writer, CSVFormat.DEFAULT.withHeader(allHeaders.toArray(new String[0])));
+
+    // Write Initial Margin Records
+    for (CSVRecord record : initialRecords) {
+        Map<String, String> row = new HashMap<>();
+        for (String header : initialParser.getHeaderMap().keySet()) {
+            row.put(header, record.get(header));
+        }
+        row.put("Site Code", "3428");
+        row.put("Type Nature", "OP");
+        row.put("Application Code", "");  // Leave empty for initial
+
+        // Handle base currency
+        row.put("Base Currency", record.isMapped("base currency") ? record.get("base currency") : "");
+
+        List<String> outputRow = new ArrayList<>();
+        for (String header : allHeaders) {
+            outputRow.add(row.getOrDefault(header, ""));
+        }
+        printer.printRecord(outputRow);
+    }
+
+    // Write Kondor Records
+    for (CSVRecord record : kondorRecords) {
+        Map<String, String> row = new HashMap<>();
+        for (String header : kondorParser.getHeaderMap().keySet()) {
+            row.put(header, record.get(header));
+        }
+        row.put("Site Code", record.get("sitecode"));
+        row.put("Application Code", record.get("application code"));
+        row.put("Type Nature", record.get("type nature"));
+
+        // Base Currency from column 22 if available
+        String baseCurrency = record.size() >= 23 ? record.get(22) : "";
+        row.put("Base Currency", baseCurrency);
+
+        List<String> outputRow = new ArrayList<>();
+        for (String header : allHeaders) {
+            outputRow.add(row.getOrDefault(header, ""));
+        }
+        printer.printRecord(outputRow);
+    }
+
+    printer.flush();
+    printer.close();
+    initialReader.close();
+    kondorReader.close();
+}
+
+}
+
+1. CsvMergerApplication.java
+
+package com.example.csvmerger;
+
+import com.example.csvmerger.service.CsvMergeService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+import java.nio.file.Path;
+
+@SpringBootApplication
+public class CsvMergerApplication implements CommandLineRunner {
+
+    @Autowired
+    private CsvMergeService csvMergeService;
+
+    public static void main(String[] args) {
+        SpringApplication.run(CsvMergerApplication.class, args);
+    }
+
+    @Override
+    public void run(String... args) throws Exception {
+        // Uncomment to test without POST API
+        /*
+        String initialPath = "C:\\Users\\h59606\\Downloads\\Initial_Margin_E0D_20250307.csv";
+        String kondorPath = "C:\\Users\\h59606\\Downloads\\KONDORFX.csv";
+        String outputPath = "C:\\Users\\h59606\\Downloads\\merged_output.csv";
+
+        csvMergeService.mergeCsvFiles(Path.of(initialPath), Path.of(kondorPath), Path.of(outputPath));
+        System.out.println("File merged and saved to: " + outputPath);
+        */
+    }
+}
+
+
+---
+
+2. CsvController.java
+
+package com.example.csvmerger.controller;
+
+import com.example.csvmerger.service.CsvMergeService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.ByteArrayOutputStream;
+
+@RestController
+@RequestMapping("/api/csv")
+public class CsvController {
+
+    @Autowired
+    private CsvMergeService csvMergeService;
+
+    @PostMapping("/merge")
+    public ResponseEntity<ByteArrayResource> mergeCsvFiles(
+            @RequestParam("initial") MultipartFile initialFile,
+            @RequestParam("kondor") MultipartFile kondorFile) throws Exception {
+
+        ByteArrayOutputStream mergedCsv = csvMergeService.mergeCsvFiles(initialFile, kondorFile);
+
+        ByteArrayResource resource = new ByteArrayResource(mergedCsv.toByteArray());
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=merged_output.csv")
+                .contentType(MediaType.parseMediaType("text/csv"))
+                .body(resource);
+    }
+}
+
+
+---
