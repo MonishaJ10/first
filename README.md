@@ -923,3 +923,99 @@ I've provided the full, updated code for your Spring Boot application, including
 
 Let me know if you'd like help testing it or creating a minimal pom.xml to ensure dependencies like commons-csv are set up correctly.
 
+
+package com.example.csvmerger.service;
+
+import org.apache.commons.csv.*;
+import org.springframework.stereotype.Service;
+
+import java.io.*;
+import java.nio.file.Path;
+import java.util.*;
+
+@Service
+public class CsvMergeService {
+
+    public void mergeCsvFiles(Path initialPath, Path kondorPath, Path outputPath) throws IOException {
+
+        List<CSVRecord> initialRecords;
+        List<CSVRecord> kondorRecords;
+
+        try (
+            Reader initialReader = new FileReader(initialPath.toFile());
+            Reader kondorReader = new FileReader(kondorPath.toFile())
+        ) {
+            CSVParser initialParser = CSVFormat.DEFAULT
+                    .withFirstRecordAsHeader()
+                    .withTrim()
+                    .parse(initialReader);
+
+            CSVParser kondorParser = CSVFormat.DEFAULT
+                    .withFirstRecordAsHeader()
+                    .withTrim()
+                    .parse(kondorReader);
+
+            initialRecords = initialParser.getRecords();
+            kondorRecords = kondorParser.getRecords();
+
+            Set<String> headers = new LinkedHashSet<>();
+            headers.addAll(initialParser.getHeaderMap().keySet());
+            headers.addAll(kondorParser.getHeaderMap().keySet());
+
+            headers.add("Application Code");
+            headers.add("Type Nature");
+
+            // Normalize key headers
+            String baseCurrencyHeader = getMatchingHeader(headers, "Base Currency");
+            String callAmountHeader = getMatchingHeader(headers, "Call Amount");
+            String rateHeader = getMatchingHeader(headers, "Rate");
+            String instrumentCodeHeader = getMatchingHeader(headers, "Instrument Code");
+
+            try (BufferedWriter writer = new BufferedWriter(new FileWriter(outputPath.toFile()));
+                 CSVPrinter csvPrinter = new CSVPrinter(writer, CSVFormat.DEFAULT.withHeader(headers.toArray(new String[0])))) {
+
+                for (CSVRecord record : initialRecords) {
+                    Map<String, String> row = new LinkedHashMap<>();
+                    for (String header : headers) {
+                        String value = record.isMapped(header) ? record.get(header) : "";
+                        row.put(header, value);
+                    }
+
+                    row.put("Application Code", "3428");
+                    row.put("Type Nature", "OP");
+
+                    // Fill instrument code if not present
+                    if (!headers.contains(instrumentCodeHeader) || row.get(instrumentCodeHeader).isEmpty()) {
+                        row.put(instrumentCodeHeader, "NULL");
+                    }
+
+                    csvPrinter.printRecord(row.values());
+                }
+
+                for (CSVRecord record : kondorRecords) {
+                    Map<String, String> row = new LinkedHashMap<>();
+                    for (String header : headers) {
+                        String value = record.isMapped(header) ? record.get(header) : "";
+                        row.put(header, value);
+                    }
+
+                    // Application Code is only for initial
+                    row.put("Application Code", "");
+                    // Get actual Type Nature from Kondor
+                    row.put("Type Nature", record.isMapped("Type Nature") ? record.get("Type Nature") : "");
+
+                    csvPrinter.printRecord(row.values());
+                }
+            }
+        }
+    }
+
+    private String getMatchingHeader(Set<String> headers, String key) {
+        for (String h : headers) {
+            if (h.equalsIgnoreCase(key)) {
+                return h;
+            }
+        }
+        return key; // fallback
+    }
+}
